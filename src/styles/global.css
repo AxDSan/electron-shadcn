@@ -130,3 +130,42 @@
         -webkit-app-region: drag;
     }
 }
+
+h1 {
+    color: #333;
+}
+
+
+.chat-container {
+    background-color: #292828;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.chat-header, .chat-footer {
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.chat-messages {
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.chat-message {
+    margin-bottom: 8px;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.chat-message.user {
+    background-color: #007bff;
+    color: #fff;
+    align-self: flex-end;
+}
+
+.chat-message.ai {
+    background-color: #e0e0e0;
+    color: #3b3939;
+    align-self: flex-start;
+}
