@@ -5,10 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import * as fal from "@fal-ai/serverless-client";
 import ToggleTheme from "./ToggleTheme";
 import { MoreVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import * as fal from "@fal-ai/serverless-client";
 
 interface Message {
     text: string;
@@ -27,22 +27,46 @@ interface ImageGenerationSettings {
     enable_safety_checker: boolean;
 }
 
+const ImageSkeleton = () => (
+    <div className="animate-pulse bg-gray-300 rounded-md w-full h-48"></div>
+  );
+
 const ChatUI = () => {
+
+    
     const [messages, setMessages] = useState<Message[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [settings, setSettings] = useState<ImageGenerationSettings>({
         prompt: "",
         image_size: "landscape_4_3",
-        num_inference_steps: 28,
+        num_inference_steps: 12,
         seed: null,
         guidance_scale: 3.5,
         sync_mode: false,
         num_images: 1,
         enable_safety_checker: true,
     });
+    useEffect(() => {
+        fal.config({
+            credentials: "38d59b0d-fcb9-403a-9156-b702f110f833:17e983b2829c63d2c47d1b1f22050f08"
+        });
+    }, []);
+
+    const [model, setModel] = useState<"fal-ai/flux/schnell" | "fal-ai/flux/dev">("fal-ai/flux/schnell");
+    const [generatingCount, setGeneratingCount] = useState(0);
 
     const handleSettingChange = (key: keyof ImageGenerationSettings, value: any) => {
         setSettings(prev => ({ ...prev, [key]: value }));
+    };
+
+    const handleModelChange = (newModel: "fal-ai/flux/schnell" | "fal-ai/flux/dev") => {
+        setModel(newModel);
+        setSettings(prev => ({
+            ...prev,
+            num_inference_steps: newModel === "fal-ai/flux/dev" 
+                ? Math.min(prev.num_inference_steps, 50)
+                : Math.min(prev.num_inference_steps, 12)
+        }));
     };
 
     const handleSend = async () => {
@@ -50,9 +74,11 @@ const ChatUI = () => {
             const userMessage: Message = { text: settings.prompt, sender: "user" };
             setMessages([...messages, userMessage]);
             setIsGenerating(true);
+            setGeneratingCount(settings.num_images);
 
             try {
-                const result = await fal.subscribe("fal-ai/flux/schnell", {
+                console.log("Sending to Model: ", model)
+                const result = await fal.subscribe(model, {
                     input: {
                         ...settings,
                         seed: settings.seed || undefined,
@@ -84,6 +110,7 @@ const ChatUI = () => {
                 setMessages((prevMessages) => [...prevMessages, errorMessage]);
             } finally {
                 setIsGenerating(false);
+                setGeneratingCount(0);
             }
         }
     };
@@ -123,7 +150,7 @@ const ChatUI = () => {
                         style={{ alignSelf: msg.sender === "user" ? "flex-end" : "flex-start" }}
                     >
                         <p>{msg.text}</p>
-                        {msg.imageUrls && (
+                        {msg.imageUrls ? (
                             <div className="grid grid-cols-2 gap-2 mt-2">
                                 {msg.imageUrls.map((url, imgIndex) => (
                                     <div key={imgIndex} className="relative group">
@@ -156,7 +183,13 @@ const ChatUI = () => {
                                     </div>
                                 ))}
                             </div>
-                        )}
+                        ) : msg.sender === "ai" && generatingCount > 0 ? (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                {Array(generatingCount).fill(0).map((_, index) => (
+                                    <ImageSkeleton key={index} />
+                                ))}
+                            </div>
+                        ) : null}
                     </div>
                 ))}
             </div>
@@ -169,6 +202,21 @@ const ChatUI = () => {
                     disabled={isGenerating}
                 />
                 <div className="grid grid-cols-2 gap-4 mb-2">
+                    <div>
+                        <Label>Model</Label>
+                        <Select
+                            value={model}
+                            onValueChange={handleModelChange}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select model" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="fal-ai/flux/schnell">Schnell</SelectItem>
+                                <SelectItem value="fal-ai/flux/dev">Dev</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div>
                         <Label>Image Size</Label>
                         <Select
@@ -191,7 +239,7 @@ const ChatUI = () => {
                             value={[settings.num_inference_steps]}
                             onValueChange={(value) => handleSettingChange("num_inference_steps", value[0])}
                             min={1}
-                            max={50}
+                            max={model === "fal-ai/flux/dev" ? 50 : 12}
                             step={1}
                         />
                     </div>
@@ -242,7 +290,6 @@ const ChatUI = () => {
                 <Button onClick={handleSend} disabled={isGenerating} className="w-full">
                     {isGenerating ? "Generating..." : "Generate Image"}
                 </Button>
-                <ToggleTheme></ToggleTheme>
             </div>
         </div>
     );
