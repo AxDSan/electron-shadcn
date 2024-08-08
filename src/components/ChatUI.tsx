@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,11 +7,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import * as fal from "@fal-ai/serverless-client";
 import ToggleTheme from "./ToggleTheme";
+import { MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface Message {
     text: string;
     sender: "user" | "ai";
-    imageUrl?: string;
+    imageUrls?: string[];
 }
 
 interface ImageGenerationSettings {
@@ -39,12 +41,6 @@ const ChatUI = () => {
         enable_safety_checker: true,
     });
 
-    useEffect(() => {
-        fal.config({
-            credentials: "38d59b0d-fcb9-403a-9156-b702f110f833:17e983b2829c63d2c47d1b1f22050f08"
-        });
-    }, []);
-
     const handleSettingChange = (key: keyof ImageGenerationSettings, value: any) => {
         setSettings(prev => ({ ...prev, [key]: value }));
     };
@@ -56,7 +52,7 @@ const ChatUI = () => {
             setIsGenerating(true);
 
             try {
-                const result = await fal.subscribe("fal-ai/flux/dev", {
+                const result = await fal.subscribe("fal-ai/flux/schnell", {
                     input: {
                         ...settings,
                         seed: settings.seed || undefined,
@@ -74,9 +70,9 @@ const ChatUI = () => {
                 });
 
                 const aiMessage: Message = {
-                    text: "Here's the image I generated based on your prompt:",
+                    text: "Here are the images I generated based on your prompt:",
                     sender: "ai",
-                    imageUrl: result.images[0].url
+                    imageUrls: result.images.map(img => img.url)
                 };
                 setMessages((prevMessages) => [...prevMessages, aiMessage]);
             } catch (error) {
@@ -92,6 +88,25 @@ const ChatUI = () => {
         }
     };
 
+    const handleImageAction = (action: string, imageUrl: string) => {
+        switch (action) {
+            case "view":
+                window.open(imageUrl, "_blank");
+                break;
+            case "copy":
+                navigator.clipboard.writeText(imageUrl);
+                break;
+            case "download":
+                const link = document.createElement("a");
+                link.href = imageUrl;
+                link.download = "generated-image.png";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                break;
+        }
+    };
+
     return (
         <div className="flex flex-col w-full h-full p-4 bg-white shadow-lg rounded-lg">
             <div className="flex items-center justify-between p-4 border-b">
@@ -102,14 +117,45 @@ const ChatUI = () => {
                 {messages.map((msg, index) => (
                     <div
                         key={index}
-                        className={`mb-4 p-2 rounded max-w-xs ${
+                        className={`mb-4 p-2 rounded ${
                             msg.sender === "user" ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-black self-start"
                         }`}
                         style={{ alignSelf: msg.sender === "user" ? "flex-end" : "flex-start" }}
                     >
                         <p>{msg.text}</p>
-                        {msg.imageUrl && (
-                            <img src={msg.imageUrl} alt="Generated" className="mt-2 h-auto w-full max-w-256 rounded" />
+                        {msg.imageUrls && (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                {msg.imageUrls.map((url, imgIndex) => (
+                                    <div key={imgIndex} className="relative group">
+                                        <img
+                                            src={url}
+                                            alt={`Generated ${imgIndex + 1}`}
+                                            className="h-auto w-full max-w-256 rounded"
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                handleImageAction("view", url);
+                                            }}
+                                        />
+                                        <DropdownMenu
+                                            trigger={
+                                                <button className="absolute top-1 right-1 p-1 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </button>
+                                            }
+                                        >
+                                            <DropdownMenuItem onClick={() => handleImageAction("view", url)}>
+                                                View Image
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleImageAction("copy", url)}>
+                                                Copy Image URL
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleImageAction("download", url)}>
+                                                Download Image
+                                            </DropdownMenuItem>
+                                        </DropdownMenu>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </div>
                 ))}
