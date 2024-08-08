@@ -10,7 +10,7 @@ export default function HomePage() {
     return (
         <>
             <div className="flex h-screen flex-col items-center justify-center gap-2 bg-gray-100">
-                <h1 className="text-4xl font-bold mb-4">{t("title")}</h1>
+                <h1 className="text-4xl font-bold mb-4">FLUX CHAT</h1>
                 <ChatUI />
             </div>
         </>
